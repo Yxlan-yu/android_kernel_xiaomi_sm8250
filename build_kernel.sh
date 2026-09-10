@@ -75,9 +75,9 @@ if [ "$ENABLE_KSU" -eq 1 ]; then
     echo "==========================================="
     echo " [*] Initializing KernelSU-Next Setup"
     echo "==========================================="
-    echo "[*] Downloading and running KernelSU-Next v3.3.0 setup script..."
-    curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s v3.3.0
-    echo "[+] KernelSU-Next v3.3.0 setup finished."
+    echo "[*] Downloading and running KernelSU-Next v3.2.0-legacy setup script..."
+    curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s v3.2.0-legacy
+    echo "[+] KernelSU-Next v3.2.0-legacy setup finished."
 fi
 
 # ==========================================
@@ -206,9 +206,6 @@ build_target() {
         echo "[*] Injecting KernelSU-Next configurations..."
         scripts/config --file "${OUT_DIR}/.config" \
             -e KSU \
-            -e KPROBES \
-            -e KPROBE_EVENTS \
-            -e KALLSYMS_ALL \
             -e THREAD_INFO_IN_TASK 
     fi
 
