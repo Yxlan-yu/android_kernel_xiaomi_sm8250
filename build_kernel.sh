@@ -78,6 +78,14 @@ if [ "$ENABLE_KSU" -eq 1 ]; then
     echo "[*] Downloading and running KernelSU-Next v3.2.0-legacy setup script..."
     curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/v3.2.0-legacy/kernel/setup.sh" | bash -s v3.2.0-legacy
     echo "[+] KernelSU-Next v3.2.0-legacy setup finished."
+    echo "[*] Patching KernelSU-Next for APT inline-hook ABI (add missing static key)..."
+    if ! grep -q "ksu_is_init_rc_hook_enabled" drivers/kernelsu/runtime/ksud_integration.c; then
+        sed -i '/bool ksu_execveat_hook __read_mostly = true;/a\struct static_key_true ksu_is_init_rc_hook_enabled = STATIC_KEY_TRUE_INIT;' drivers/kernelsu/runtime/ksud_integration.c
+        sed -i '/bool ksu_execveat_hook __read_mostly = true;/a\EXPORT_SYMBOL_GPL(ksu_is_init_rc_hook_enabled);' drivers/kernelsu/runtime/ksud_integration.c
+        echo "[+] Static key ksu_is_init_rc_hook_enabled added."
+    else
+        echo "[*] Static key already present, skipping."
+    fi
 fi
 
 # ==========================================
