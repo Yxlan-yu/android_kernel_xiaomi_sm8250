@@ -206,7 +206,7 @@ build_target() {
         echo "[*] Injecting KernelSU-Next configurations..."
         scripts/config --file "${OUT_DIR}/.config" \
             -e KSU \
-            -e THREAD_INFO_IN_TASK \
+            -e THREAD_INFO_IN_TASK 
     fi
 
     # 3. MIUI configurations
