@@ -206,6 +206,9 @@ build_target() {
         echo "[*] Injecting KernelSU-Next configurations..."
         scripts/config --file "${OUT_DIR}/.config" \
             -e KSU \
+            -e KPROBES \
+            -e KPROBE_EVENTS \
+            -e KALLSYMS_ALL \
             -e THREAD_INFO_IN_TASK 
     fi
 
@@ -243,6 +246,13 @@ build_target() {
     # We always need to re-evaluate dependencies because BBG is injected unconditionally
     echo "[*] Updating config (make olddefconfig)..."
     make "${MAKE_OPTS[@]}" olddefconfig
+
+    # Verify KernelSU is really enabled after olddefconfig (KSU depends on KPROBES)
+    if [ "$ENABLE_KSU" -eq 1 ]; then
+        echo "[*] Verifying KSU config..."
+        grep -E "^CONFIG_KSU=" "${OUT_DIR}/.config" || echo "[!] WARNING: CONFIG_KSU not found in .config"
+        grep -E "^CONFIG_KPROBES=" "${OUT_DIR}/.config" || echo "[!] WARNING: CONFIG_KPROBES not found in .config"
+    fi
 
     # ----------------------------------------------------
     # Compilation
