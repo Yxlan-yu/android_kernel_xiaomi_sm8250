@@ -76,7 +76,7 @@ if [ "$ENABLE_KSU" -eq 1 ]; then
     echo " [*] Initializing KernelSU-Next Setup"
     echo "==========================================="
     echo "[*] Downloading and running KernelSU-Next v3.2.0-legacy setup script..."
-    curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s v3.2.0-legacy
+    curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/v3.2.0-legacy/kernel/setup.sh" | bash -s v3.2.0-legacy
     echo "[+] KernelSU-Next v3.2.0-legacy setup finished."
 fi
 
@@ -273,7 +273,7 @@ build_target() {
         find "${OUT_DIR}/arch/arm64/boot/dts" -name '*.dtb' -exec cat {} + > "${OUT_DIR}/arch/arm64/boot/dtb"
 
         echo "[*] Packaging to AnyKernel3 ($OS_TYPE)..."
-        # 确保独立打包：清空现有的 kernels 目录
+        # 纭繚鐙珛鎵撳寘锛氭竻绌虹幇鏈夌殑 kernels 鐩綍
         rm -rf anykernel/kernels/*
         mkdir -p "anykernel/kernels/${OS_TYPE}/"
         
@@ -284,8 +284,7 @@ build_target() {
             cp "${OUT_DIR}/arch/arm64/boot/dtbo.img" "anykernel/kernels/${OS_TYPE}/"
         fi
         
-        # 确定 ZIP 文件名
-        local KSU_ZIP_STR="NoKernelSU"
+        # 纭畾 ZIP 鏂囦欢鍚?        local KSU_ZIP_STR="NoKernelSU"
         if [ "$ENABLE_KSU" -eq 1 ]; then
             KSU_ZIP_STR="KernelSU-Next"
         fi
