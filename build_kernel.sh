@@ -85,6 +85,35 @@ if [ "$ENABLE_KSU" -eq 1 ]; then
     else
         echo "[*] Static key already present, skipping."
     fi
+
+    echo "[*] Activating KSU-Next manual-hook call sites for APT ABI..."
+    # 1) kernel/reboot.c : supercall entry (ksu_handle_sys_reboot) gated behind CONFIG_KSU_SUSFS
+    if grep -q "#ifdef CONFIG_KSU_SUSFS" kernel/reboot.c; then
+        sed -i 's|#ifdef CONFIG_KSU_SUSFS|#ifdef CONFIG_KSU|g; s|#endif // #ifdef CONFIG_KSU_SUSFS|#endif|g; s|#endif #ifdef CONFIG_KSU_SUSFS|#endif|g' kernel/reboot.c
+        echo "[+] reboot.c: CONFIG_KSU_SUSFS -> CONFIG_KSU"
+    fi
+
+    # 2) fs/exec.c : replace SUSFS-gated execve hooks with plain CONFIG_KSU calls
+    if grep -q "ksu_handle_execveat_sucompat" fs/exec.c; then
+        perl -0pi -e 's/#ifdef CONFIG_KSU_SUSFS\n(?:extern[^\n]*\n)+?extern int ksu_handle_execveat\(int \*fd, struct filename \*\*filename_ptr, void \*argv,\n[^\n]*\n[^\n]*\n[^\n]*\n#endif\n)/#ifdef CONFIG_KSU\nextern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);\nextern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);\n#endif\n/s' fs/exec.c
+        perl -0pi -e 's/#ifdef CONFIG_KSU_SUSFS\n\tif \(likely\(susfs_is_current_proc_umounted\(\)\)\)\n\t\tgoto orig_flow;\n\tif \(static_branch_likely\(&ksu_su_compat_enabled\)\) \{\n\t\tif \(static_branch_unlikely\(&susfs_is_sdcard_android_data_not_decrypted\)\)\n\t\tksu_handle_execveat\(&fd, &filename, &argv, &envp, &flags\);\n\telse\n\t\tksu_handle_execveat_sucompat\(&fd, &filename, &argv, &envp, &flags\);\n\t\}\norig_flow:\n#endif\n/#ifdef CONFIG_KSU\n\tksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);\n#endif\n/s' fs/exec.c
+        grep -q "ksu_handle_execveat_sucompat(&fd" fs/exec.c && echo "[+] exec.c: execve hooks activated" || echo "[!] exec.c KSU hook replacement failed."
+    fi
+
+    # 3) fs/open.c : faccessat hook (used by sucompat to fake su/sh access check)
+    if grep -q "ksu_handle_faccessat" fs/open.c && grep -q "CONFIG_KSU_SUSFS" fs/open.c; then
+        perl -0pi -e 's/#ifdef CONFIG_KSU_SUSFS\n(?:extern[^\n]*\n)+?extern int ksu_handle_faccessat\(int \*dfd, const char __user \*\*filename_user, int \*mode,\n[^\n]*\n#endif\n)/#ifdef CONFIG_KSU\nextern bool __ksu_is_allow_uid_for_current(uid_t uid);\nextern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);\n#endif\n/s' fs/open.c
+        perl -0pi -e 's/#ifdef CONFIG_KSU_SUSFS\n\tif \(likely\(susfs_is_current_proc_umounted\(\)\)\)\n\t\tgoto orig_flow;\n\tif \(static_branch_likely\(&ksu_su_compat_enabled\)\)\n\t\tif \(unlikely\(__ksu_is_allow_uid_for_current\(current_uid\(\)\.val\)\)\) \{\n\t\t\tksu_handle_faccessat\(&dfd, &filename, &mode, NULL\);\n\t\}\n\norig_flow:\n#endif\n/#ifdef CONFIG_KSU\n\tif (unlikely(__ksu_is_allow_uid_for_current(current_uid().val))) {\n\t\tksu_handle_faccessat(&dfd, &filename, &mode, NULL);\n\t}\n#endif\n/s' fs/open.c
+        grep -q "ksu_handle_faccessat(&dfd" fs/open.c && echo "[+] open.c: faccessat hook activated" || echo "[!] open.c KSU hook replacement failed."
+    fi
+
+    # 4) fs/stat.c : only ksu_handle_stat block (skip SUSFS-only vfs_fstat/kstat)
+    if grep -q "ksu_handle_stat" fs/stat.c; then
+        perl -0pi -e 's/#ifdef CONFIG_KSU_SUSFS\n(?:extern[^\n]*\n)+?extern int ksu_handle_stat\(int \*dfd, const char __user \*\*filename_user, int \*flags\);\n#endif\n/#ifdef CONFIG_KSU\nextern bool __ksu_is_allow_uid_for_current(uid_t uid);\nextern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);\n#endif\n/s' fs/stat.c
+        perl -0pi -e 's/#ifdef CONFIG_KSU_SUSFS\n\tif \(likely\(susfs_is_current_proc_umounted\(\)\)\)\n\t\tgoto orig_flow;\n\tif \(static_branch_likely\(&ksu_su_compat_enabled\)\) \{\n\t\tif \(unlikely\(__ksu_is_allow_uid_for_current\(current_uid\(\)\.val\)\)\)\n\t\t\tksu_handle_stat\(&dfd, &filename, &flags\);\n\t\}\norig_flow:\n#endif\n/#ifdef CONFIG_KSU\n\tif (unlikely(__ksu_is_allow_uid_for_current(current_uid().val)))\n\t\tksu_handle_stat(&dfd, &filename, &flags);\n#endif\n/s' fs/stat.c
+        grep -q "ksu_handle_stat(&dfd" fs/stat.c && echo "[+] stat.c: stat hook activated" || echo "[!] stat.c KSU hook replacement failed."
+    fi
+    echo "[+] KSU-Next manual-hook activation done."
 fi
 
 # ==========================================
